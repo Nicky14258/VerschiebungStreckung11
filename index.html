@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Graphen-Werkstatt</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=STIX+Two+Text:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+/* Layout: Kopf auf Karopapier, Stationen-Leiste, darunter zweispaltig: Koordinatensystem links, Regler rechts (mobil gestapelt) */
+:root{
+  --paper:#f7f9fc; --surface:#ffffff; --soft:#edf2f9; --ink:#14213a; --muted:#56637b;
+  --line:#d6dfeb; --grid:#e2e9f3; --grid-strong:#c4d1e3; --axis:#26354f;
+  --f:#1592cf; --g:#d81f5c; --target:#14213a;
+  --ydir:#7046c9; --xdir:#0c836a; --ok:#1d8048; --bad:#b9420e;
+  --ok-bg:#e5f5ea; --bad-bg:#fbece3;
+  --font-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body:"Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --font-math:"STIX Two Text", "Cambria Math", "Times New Roman", serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --paper:#0e1421; --surface:#151d2d; --soft:#1b2537; --ink:#e5ebf5; --muted:#9ba8be;
+  --line:#2a364e; --grid:#1b2536; --grid-strong:#2b3a55; --axis:#c3cfe3;
+  --f:#4db8ee; --g:#ff5c8c; --target:#e5ebf5;
+  --ydir:#ab8cf2; --xdir:#3fc89f; --ok:#5ad38a; --bad:#fb9a5c;
+  --ok-bg:#16301f; --bad-bg:#35211a; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --paper:#0e1421; --surface:#151d2d; --soft:#1b2537; --ink:#e5ebf5; --muted:#9ba8be;
+  --line:#2a364e; --grid:#1b2536; --grid-strong:#2b3a55; --axis:#c3cfe3;
+  --f:#4db8ee; --g:#ff5c8c; --target:#e5ebf5;
+  --ydir:#ab8cf2; --xdir:#3fc89f; --ok:#5ad38a; --bad:#fb9a5c;
+  --ok-bg:#16301f; --bad-bg:#35211a; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.5}
+.wrap{max-width:1120px;margin:0 auto;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+
+header.top{
+  background-color:var(--surface);
+  background-image:linear-gradient(var(--grid) 1px, transparent 1px),linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size:22px 22px;border-bottom:1px solid var(--line)}
+header.top .wrap{padding-block:28px 22px;display:flex;flex-wrap:wrap;gap:12px 32px;align-items:end;justify-content:space-between}
+.eyebrow{font-size:.78rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:700}
+h1{font-family:var(--font-display);font-weight:800;font-size:clamp(2rem,5vw,3rem);line-height:1.02;margin:.15em 0 .2em;text-wrap:balance}
+h1 .gx{color:var(--g)} h1 .fx{color:var(--f)}
+.lead{margin:0;color:var(--muted);max-width:56ch}
+.formula{font-family:var(--font-math);font-size:clamp(1.15rem,2.6vw,1.5rem);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 16px;white-space:nowrap}
+.pa,.pd{color:var(--ydir);font-weight:600} .pb,.pc{color:var(--xdir);font-weight:600}
+
+nav.steps{position:sticky;top:env(safe-area-inset-top, 0px);z-index:5;background:var(--paper);border-bottom:1px solid var(--line)}
+nav.steps .wrap{display:flex;gap:6px;overflow-x:auto;padding-block:10px}
+.step-btn{flex:1 0 auto;display:flex;align-items:center;gap:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:8px 14px;font:inherit;cursor:pointer;text-align:left}
+.step-btn .n{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--soft);font-family:var(--font-display);font-weight:700}
+.step-btn small{display:block;color:var(--muted);font-size:.78rem;line-height:1.2}
+.step-btn b{display:block;font-weight:700;line-height:1.2}
+.step-btn[aria-current="step"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.step-btn[aria-current="step"] .n{background:var(--ink);color:var(--paper)}
+.step-btn.done .n{background:var(--ok);color:var(--surface)}
+
+main .wrap{padding-block:24px 48px}
+section.station{display:grid;gap:20px}
+.station-head h2{font-family:var(--font-display);font-size:1.6rem;margin:0;line-height:1.15}
+.station-head p{margin:.3em 0 0;color:var(--muted);max-width:70ch}
+
+.grid2{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:860px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0}
+.panel h3{font-family:var(--font-display);font-size:1.05rem;margin:0 0 10px}
+
+.plot-wrap{position:relative;width:100%}
+.plot-wrap canvas{display:block;width:100%;border-radius:10px;background:var(--surface);touch-action:pan-y}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-size:.92rem;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:8px}
+.sw{width:26px;height:0;border-top:3px solid}
+.sw.f{border-color:var(--f)} .sw.g{border-color:var(--g)} .sw.t{border-top:3px dashed var(--target)}
+
+.fpick{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.chip{border:1px solid var(--line);background:var(--soft);color:var(--ink);border-radius:999px;padding:5px 12px;font-family:var(--font-math);font-size:1rem;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--f);border-color:var(--f);color:var(--surface)}
+
+.terms{display:grid;gap:4px;font-family:var(--font-math);font-size:1.2rem;margin:4px 0 0}
+.terms .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.terms .lab{min-width:3.2em}
+.terms .f-lab{color:var(--f);font-weight:600} .terms .g-lab{color:var(--g);font-weight:600}
+.frac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;font-size:.92em;line-height:1.1;margin:0 2px}
+.frac>span:last-child{border-top:1px solid currentColor;padding-top:1px}
+sup{font-size:.68em}
+
+.sliders{display:grid;gap:14px}
+.sgroup{display:grid;gap:10px;border-left:3px solid var(--c);padding-left:12px}
+.sgroup.y{--c:var(--ydir)} .sgroup.x{--c:var(--xdir)}
+.sgroup-title{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--c)}
+.srow{display:grid;grid-template-columns:2.2em minmax(0,1fr) 3.4em;gap:10px;align-items:center}
+.srow .pn{font-family:var(--font-math);font-style:italic;font-size:1.35rem;font-weight:600;color:var(--c);text-align:center}
+.srow output{font-variant-numeric:tabular-nums;text-align:right;font-weight:700}
+.srow .hint{grid-column:2 / 4;font-size:.82rem;color:var(--muted);margin-top:-6px}
+input[type=range]{width:100%;accent-color:var(--c);height:28px}
+.srow.locked{opacity:.35}
+
+.btn{font:inherit;font-weight:700;border-radius:10px;padding:9px 16px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn:disabled{opacity:.45;cursor:default}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--f);outline-offset:2px}
+
+ol.steps-desc{margin:0;padding-left:1.4em;display:grid;gap:6px}
+ol.steps-desc li::marker{font-weight:700;color:var(--muted)}
+.tag{display:inline-block;font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:6px;padding:1px 6px;margin-right:6px;color:var(--surface);vertical-align:1px}
+.tag.x{background:var(--xdir)} .tag.y{background:var(--ydir)}
+.empty{color:var(--muted);font-style:italic}
+
+details.disc{border-top:1px solid var(--line);padding:10px 0}
+details.disc:first-of-type{border-top:0}
+details.disc summary{cursor:pointer;font-weight:700;list-style:none;display:flex;gap:10px}
+details.disc summary::before{content:"?";flex:none;display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--soft);font-family:var(--font-display);font-size:.85rem}
+details.disc[open] summary::before{content:"✓";background:var(--ok);color:var(--surface)}
+details.disc p{margin:6px 0 0 32px;color:var(--muted)}
+
+.mission-bar{display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center;justify-content:space-between}
+.mission-bar .mt{font-family:var(--font-display);font-weight:700;font-size:1.2rem}
+.dots{display:flex;gap:6px}
+.dots i{width:12px;height:12px;border-radius:50%;background:var(--grid-strong)}
+.dots i.cur{background:var(--ink)} .dots i.ok{background:var(--ok)} .dots i.skip{background:var(--bad)}
+.meter{height:10px;border-radius:999px;background:var(--soft);overflow:hidden;border:1px solid var(--line)}
+.meter>div{height:100%;width:0;background:var(--g);transition:width .2s}
+.meter-lab{display:flex;justify-content:space-between;font-size:.85rem;color:var(--muted);margin-bottom:4px}
+.banner{border-radius:12px;padding:12px 14px;border:1px solid}
+.banner.ok{background:var(--ok-bg);border-color:var(--ok)}
+.banner.bad{background:var(--bad-bg);border-color:var(--bad)}
+.banner h4{margin:0 0 4px;font-family:var(--font-display);font-size:1.05rem}
+.banner p{margin:4px 0 0}
+.score-pill{font-variant-numeric:tabular-nums;font-weight:700;background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:4px 12px}
+
+.quiz{max-width:760px}
+.q-prompt{font-size:1.1rem;margin:0 0 6px}
+.q-math{font-family:var(--font-math);font-size:1.25rem;margin:6px 0 14px;display:flex;flex-wrap:wrap;gap:6px 24px}
+.opts{display:grid;gap:8px}
+.opt{text-align:left;font:inherit;padding:11px 14px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;display:flex;gap:10px;align-items:flex-start}
+.opt .k{flex:none;font-family:var(--font-display);font-weight:700;color:var(--muted)}
+.opt:hover:not(:disabled){border-color:var(--ink)}
+.opt:disabled{cursor:default}
+.opt.right{border-color:var(--ok);background:var(--ok-bg)}
+.opt.wrong{border-color:var(--bad);background:var(--bad-bg)}
+.opt .m{font-family:var(--font-math);font-size:1.12rem}
+
+.result-big{font-family:var(--font-display);font-weight:800;font-size:clamp(2.6rem,8vw,4rem);line-height:1}
+.rules{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (max-width:640px){.rules{grid-template-columns:minmax(0,1fr)}}
+.rule{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface)}
+.rule .m{font-family:var(--font-math);font-size:1.15rem}
+.rule p{margin:2px 0 0;color:var(--muted);font-size:.92rem}
+.trap{border:2px dashed var(--g);border-radius:12px;padding:12px 14px}
+.trap b{color:var(--g)}
+.muted{color:var(--muted)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<header class="top">
+  <div class="wrap">
+    <div>
+      <div class="eyebrow">Mathematik 11 · Spezielle Eigenschaften von Funktionen</div>
+      <h1>Graphen-Werkstatt: <span class="fx">G<sub>f</sub></span> wird <span class="gx">G<sub>g</sub></span></h1>
+      <p class="lead">Drei Stationen, etwa 8 Minuten: Erst ausprobieren, dann Zielgraphen treffen, zum Schluss das Quiz.</p>
+    </div>
+    <div class="formula" aria-label="g von x gleich a mal f von b mal x plus c, plus d">g(x) = <span class="pa">a</span> · f(<span class="pb">b</span> · (x + <span class="pc">c</span>)) + <span class="pd">d</span></div>
+  </div>
+</header>
+
+<nav class="steps" aria-label="Stationen">
+  <div class="wrap">
+    <button class="step-btn" data-go="1" aria-current="step"><span class="n">1</span><span><b>Entdecken</b><small>ca. 2 Min.</small></span></button>
+    <button class="step-btn" data-go="2"><span class="n">2</span><span><b>Zielgraph treffen</b><small>ca. 4 Min.</small></span></button>
+    <button class="step-btn" data-go="3"><span class="n">3</span><span><b>Quiz</b><small>ca. 3 Min.</small></span></button>
+    <button class="step-btn" data-go="4"><span class="n">★</span><span><b>Ergebnis</b><small>Merke &amp; Exit-Ticket</small></span></button>
+  </div>
+</nav>
+
+<main><div class="wrap">
+
+<!-- STATION 1 -->
+<section class="station" id="st1">
+  <div class="station-head">
+    <h2>Station 1 · Entdecken</h2>
+    <p>Wähle eine Ausgangsfunktion f und bewege die vier Regler. Beobachte, wie sich der rote Graph G<sub>g</sub> gegenüber dem blauen G<sub>f</sub> verändert.</p>
+  </div>
+  <div class="grid2">
+    <div class="panel">
+      <div class="fpick" id="fpick1" role="group" aria-label="Ausgangsfunktion"></div>
+      <div class="plot-wrap"><canvas id="cv1" aria-label="Koordinatensystem mit den Graphen von f und g"></canvas></div>
+      <div class="legend"><span><i class="sw f"></i>G<sub>f</sub> (Ausgangsgraph)</span><span><i class="sw g"></i>G<sub>g</sub> (veränderter Graph)</span></div>
+      <div class="terms" id="terms1"></div>
+    </div>
+    <div style="display:grid;gap:16px;min-width:0">
+      <div class="panel">
+        <h3>Regler</h3>
+        <div class="sliders" id="sl1"></div>
+        <div class="btns" style="margin-top:14px"><button class="btn ghost" id="reset1">Alle Regler zurücksetzen</button></div>
+      </div>
+      <div class="panel">
+        <h3>So entsteht G<sub>g</sub> aus G<sub>f</sub></h3>
+        <div id="desc1"></div>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>Forscheraufträge</h3>
+    <details class="disc"><summary>Stelle c = 2 ein. Wandert der Graph nach links oder nach rechts?</summary><p>Nach <b>links</b>, um 2 Einheiten. f(x + 2) erreicht jeden Funktionswert schon 2 Einheiten früher als f(x). Merke: f(x + c) bedeutet Verschiebung um −c in x-Richtung.</p></details>
+    <details class="disc"><summary>Stelle b = 2 ein. Wird der Graph breiter oder schmaler?</summary><p><b>Schmaler.</b> Es ist eine Streckung mit dem Faktor <span class="frac"><span>1</span><span>b</span></span> = ½ in x-Richtung. Bei b = 0,5 wird der Graph doppelt so breit.</p></details>
+    <details class="disc"><summary>Wähle x² und vergleiche a = 4 mit b = 2. Was fällt dir auf?</summary><p>Beide Graphen sind <b>gleich</b>, denn (2x)² = 4x². Bei der Normalparabel kann man eine Streckung in x-Richtung also auch als Streckung in y-Richtung schreiben.</p></details>
+    <details class="disc"><summary>Wähle 1/x. Wie wandern die Asymptoten, wenn du c und d veränderst?</summary><p>Die senkrechte Asymptote liegt bei <b>x = −c</b>, die waagrechte bei <b>y = d</b>.</p></details>
+  </div>
+  <div class="btns"><button class="btn" data-go="2">Weiter zu Station 2</button></div>
+</section>
+
+<!-- STATION 2 -->
+<section class="station" id="st2" hidden>
+  <div class="station-head">
+    <h2>Station 2 · Zielgraph treffen</h2>
+    <p>Stelle die Regler so ein, dass der rote Graph genau auf dem gestrichelten Zielgraphen liegt. Ohne Tipp gibt es 2 Punkte, mit Tipp 1 Punkt.</p>
+  </div>
+  <div class="panel mission-bar">
+    <div><div class="mt" id="mTitle">Mission 1 von 6</div><div class="muted" id="mBase"></div></div>
+    <div class="dots" id="mDots" aria-hidden="true"></div>
+    <span class="score-pill" id="mScore">0 / 12 Punkte</span>
+  </div>
+  <div class="grid2">
+    <div class="panel">
+      <div class="plot-wrap"><canvas id="cv2" aria-label="Koordinatensystem mit Zielgraph"></canvas></div>
+      <div class="legend"><span><i class="sw f"></i>G<sub>f</sub></span><span><i class="sw t"></i>Zielgraph</span><span><i class="sw g"></i>dein Graph G<sub>g</sub></span></div>
+      <div class="terms" id="terms2"></div>
+    </div>
+    <div style="display:grid;gap:16px;min-width:0">
+      <div class="panel">
+        <div class="meter-lab"><span>Übereinstimmung</span><span id="mPct">0 %</span></div>
+        <div class="meter"><div id="mMeter"></div></div>
+        <div class="sliders" id="sl2" style="margin-top:16px"></div>
+      </div>
+      <div id="mFeedback"></div>
+      <div class="btns" id="mBtns">
+        <button class="btn ghost" id="mHint">Tipp anzeigen (−1 Punkt)</button>
+        <button class="btn ghost" id="mSkip">Überspringen</button>
+        <button class="btn" id="mNext" hidden>Nächste Mission</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATION 3 -->
+<section class="station" id="st3" hidden>
+  <div class="station-head">
+    <h2>Station 3 · Quiz</h2>
+    <p>Sechs Fragen im Stil des Übungsblatts. Achte besonders auf die Vorzeichen in der Klammer.</p>
+  </div>
+  <div class="panel quiz" id="quiz"></div>
+</section>
+
+<!-- ERGEBNIS -->
+<section class="station" id="st4" hidden>
+  <div class="station-head"><h2>Ergebnis</h2></div>
+  <div class="grid2">
+    <div class="panel">
+      <div class="eyebrow">Deine Punkte</div>
+      <div class="result-big" id="rTotal">0 / 18</div>
+      <p id="rDetail" class="muted"></p>
+      <p id="rMsg" style="font-weight:700;margin-bottom:0"></p>
+    </div>
+    <div class="panel">
+      <h3>Exit-Ticket</h3>
+      <p style="margin-top:0">Beschreibe in einem Satz, wie der Graph von <span style="font-family:var(--font-math);font-size:1.1em">g(x) = 2 · (x − 3)² + 1</span> aus der Normalparabel entsteht.</p>
+      <details class="disc"><summary>Lösung zeigen</summary><p>G<sub>f</sub> wird mit dem Faktor 2 in y-Richtung gestreckt, um 3 in x-Richtung (nach rechts) und um 1 in y-Richtung (nach oben) verschoben.</p></details>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>Merke</h3>
+    <div class="rules">
+      <div class="rule"><div class="m">g(x) = <span class="pa">a</span> · f(x)</div><p><span class="tag y">y</span>Streckung mit dem Faktor a in y-Richtung</p></div>
+      <div class="rule"><div class="m">h(x) = f(x) + <span class="pd">d</span></div><p><span class="tag y">y</span>Verschiebung um d in y-Richtung</p></div>
+      <div class="rule"><div class="m">k(x) = f(<span class="pb">b</span> · x)</div><p><span class="tag x">x</span>Streckung mit dem Faktor <span class="frac"><span>1</span><span>b</span></span> in x-Richtung</p></div>
+      <div class="rule"><div class="m">l(x) = f(x + <span class="pc">c</span>)</div><p><span class="tag x">x</span>Verschiebung um −c in x-Richtung</p></div>
+    </div>
+    <div class="trap" style="margin-top:12px"><b>Typischer Fehler:</b> Alles, was <i>in</i> der Klammer an x passiert, wirkt „umgekehrt“: + c verschiebt nach links, der Faktor b streckt mit <span class="frac"><span>1</span><span>b</span></span>. Was <i>außerhalb</i> passiert (a und d), wirkt genau so, wie es dasteht.</div>
+  </div>
+  <div class="btns"><button class="btn ghost" id="restart">Nochmal von vorn</button></div>
+</section>
+
+</div></main>
+
+<script>
+(function(){
+"use strict";
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+/* ---------- Funktionen ---------- */
+const FUNCS = {
+  sq:   {chip:'x²',            html:'x<sup>2</sup>',              f:x=>x*x},
+  cu:   {chip:'x³',            html:'x<sup>3</sup>',              f:x=>x*x*x},
+  inv:  {chip:'1/x',           html:'<span class="frac"><span>1</span><span>x</span></span>', f:x=>1/x},
+  exp:  {chip:'2ˣ',            html:'2<sup>x</sup>',              f:x=>Math.pow(2,x)},
+  sin:  {chip:'sin x',         html:'sin(x)',                     f:Math.sin},
+  quart:{chip:'¼x⁴ − x²',      html:'0,25x<sup>4</sup> − x<sup>2</sup>', f:x=>0.25*x*x*x*x-x*x}
+};
+const DEF = {a:1,b:1,c:0,d:0};
+const gFun = (k,p) => x => p.a*FUNCS[k].f(p.b*(x+p.c))+p.d;
+
+const num = v => String(Math.round(v*100)/100).replace('.',',').replace('-','−');
+function gcd(a,b){return b?gcd(b,a%b):a}
+function recipHTML(b){ const n=Math.round(b*4), g=gcd(4,n), z=4/g, q=n/g;
+  return q===1 ? String(z) : `<span class="frac"><span>${z}</span><span>${q}</span></span>`; }
+
+function inner(p){
+  let s='x', simple=true;
+  if(p.c!==0){ s=`x ${p.c>0?'+':'−'} ${num(Math.abs(p.c))}`; simple=false; }
+  if(p.b!==1){ s = p.c!==0 ? `${num(p.b)}(${s})` : `${num(p.b)}x`; simple=false; }
+  return {s, simple};
+}
+function termHTML(k,p){
+  const i=inner(p), w=i.simple?i.s:`(${i.s})`, A=p.a!==1?num(p.a):'';
+  let t;
+  switch(k){
+    case 'sq': t=`${w}<sup>2</sup>`; if(A) t=`${A} · ${t}`; break;
+    case 'cu': t=`${w}<sup>3</sup>`; if(A) t=`${A} · ${t}`; break;
+    case 'inv': t=`<span class="frac"><span>${A||'1'}</span><span>${i.s}</span></span>`; break;
+    case 'exp': t=`2<sup>${i.s}</sup>`; if(A) t=`${A} · ${t}`; break;
+    case 'sin': t=`sin(${i.s})`; if(A) t=`${A} · ${t}`; break;
+    case 'quart': t=`0,25${w}<sup>4</sup> − ${w}<sup>2</sup>`; if(A) t=`${A} · (${t})`; break;
+  }
+  if(p.d!==0) t+=` ${p.d>0?'+':'−'} ${num(Math.abs(p.d))}`;
+  return t;
+}
+function descList(p){
+  const out=[];
+  if(p.b!==1) out.push(`<span class="tag x">x</span>Streckung mit dem Faktor ${recipHTML(p.b)} in x-Richtung ${p.b>1?'(schmaler)':'(breiter)'}`);
+  if(p.c!==0) out.push(`<span class="tag x">x</span>Verschiebung um ${num(-p.c)} in x-Richtung (${num(Math.abs(p.c))} nach ${p.c>0?'links':'rechts'})`);
+  if(p.a!==1) out.push(`<span class="tag y">y</span>Streckung mit dem Faktor ${num(p.a)} in y-Richtung${p.a<1?' (der Graph wird gestaucht)':''}`);
+  if(p.d!==0) out.push(`<span class="tag y">y</span>Verschiebung um ${num(p.d)} in y-Richtung (nach ${p.d>0?'oben':'unten'})`);
+  return out;
+}
+function descHTML(p){
+  const l=descList(p);
+  return l.length ? `<ol class="steps-desc">${l.map(s=>`<li>${s}</li>`).join('')}</ol>` : `<p class="empty" style="margin:0">Alle Regler stehen auf dem Ausgangswert: G<sub>g</sub> liegt genau auf G<sub>f</sub>.</p>`;
+}
+
+/* ---------- Koordinatensystem ---------- */
+const plots=[];
+function makePlot(canvas){
+  const ctx=canvas.getContext('2d'); const XR=5.5;
+  const st={W:0,H:0,u:1,curves:[]};
+  function resize(){
+    const W=canvas.parentElement.clientWidth; if(!W) return;
+    const H=Math.round(Math.min(W*0.68, 540)); const dpr=window.devicePixelRatio||1;
+    canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr); canvas.style.height=H+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0); st.W=W; st.H=H; st.u=W/(2*XR); draw();
+  }
+  const X=x=>st.W/2+x*st.u, Y=y=>st.H/2-y*st.u;
+  function draw(curves){
+    if(curves) st.curves=curves; const {W,H,u}=st; if(!W) return;
+    ctx.clearRect(0,0,W,H);
+    const xm=W/2/u, ym=H/2/u;
+    ctx.lineWidth=1;
+    for(let k=Math.ceil(-xm*2);k<=xm*2;k++){ ctx.strokeStyle=k%2?css('--grid'):css('--grid-strong'); ctx.beginPath(); ctx.moveTo(Math.round(X(k/2))+.5,0); ctx.lineTo(Math.round(X(k/2))+.5,H); ctx.stroke(); }
+    for(let k=Math.ceil(-ym*2);k<=ym*2;k++){ ctx.strokeStyle=k%2?css('--grid'):css('--grid-strong'); ctx.beginPath(); ctx.moveTo(0,Math.round(Y(k/2))+.5); ctx.lineTo(W,Math.round(Y(k/2))+.5); ctx.stroke(); }
+    const ax=css('--axis'); ctx.strokeStyle=ax; ctx.fillStyle=ax; ctx.lineWidth=1.4;
+    ctx.beginPath(); ctx.moveTo(0,Y(0)); ctx.lineTo(W-2,Y(0)); ctx.moveTo(X(0),H); ctx.lineTo(X(0),2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(W-1,Y(0)); ctx.lineTo(W-10,Y(0)-4); ctx.lineTo(W-10,Y(0)+4); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(X(0),1); ctx.lineTo(X(0)-4,10); ctx.lineTo(X(0)+4,10); ctx.fill();
+    ctx.font=`${W<480?11:13}px ${css('--font-body')}`; ctx.textAlign='center'; ctx.textBaseline='top';
+    for(let i=Math.ceil(-xm+0.3);i<=xm-0.3;i++){ if(!i) continue; ctx.fillText(String(i).replace('-','−'),X(i),Y(0)+4); ctx.fillRect(X(i)-.5,Y(0)-3,1,6); }
+    ctx.textAlign='right'; ctx.textBaseline='middle';
+    for(let i=Math.ceil(-ym+0.3);i<=ym-0.3;i++){ if(!i) continue; ctx.fillText(String(i).replace('-','−'),X(0)-6,Y(i)); ctx.fillRect(X(0)-3,Y(i)-.5,6,1); }
+    ctx.textAlign='left'; ctx.fillText('x',W-14,Y(0)-12); ctx.fillText('y',X(0)+8,10);
+    for(const c of st.curves){
+      ctx.strokeStyle=css(c.color); ctx.lineWidth=c.width||2.6; ctx.setLineDash(c.dash||[]); ctx.lineJoin='round'; ctx.lineCap='round';
+      ctx.globalAlpha=c.alpha||1; ctx.beginPath(); let pen=false, py=0;
+      for(let px=0;px<=W;px+=1){
+        const x=(px-W/2)/u, y=c.fn(x);
+        if(!isFinite(y)||Math.abs(y)>ym*4){ pen=false; continue; }
+        const sy=Y(y);
+        if(pen && Math.abs(sy-py)>H){ pen=false; }
+        if(pen) ctx.lineTo(px,sy); else ctx.moveTo(px,sy);
+        pen=true; py=sy;
+      }
+      ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1;
+    }
+  }
+  new ResizeObserver(resize).observe(canvas.parentElement);
+  const api={draw,resize}; plots.push(api); return api;
+}
+const redrawAll=()=>plots.forEach(p=>p.draw());
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',redrawAll);
+new MutationObserver(redrawAll).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+if(document.fonts) document.fonts.ready.then(redrawAll);
+
+/* ---------- Regler ---------- */
+const SL = [
+  {k:'a',dir:'y',min:.25,max:3,step:.25,hint:'Faktor außen: Streckung in y-Richtung'},
+  {k:'d',dir:'y',min:-3,max:3,step:.5,hint:'Summand außen: Verschiebung in y-Richtung'},
+  {k:'b',dir:'x',min:.25,max:3,step:.25,hint:'Faktor innen: Streckung mit 1/b in x-Richtung'},
+  {k:'c',dir:'x',min:-4,max:4,step:.5,hint:'Summand innen: Verschiebung um −c in x-Richtung'}
+];
+function makeSliders(box,prefix,onChange){
+  const p={...DEF}; const inputs={};
+  const groups={y:'Wirkung in y-Richtung',x:'Wirkung in x-Richtung'};
+  for(const dir of ['y','x']){
+    const g=document.createElement('div'); g.className='sgroup '+dir;
+    g.innerHTML=`<div class="sgroup-title">${groups[dir]}</div>`;
+    for(const s of SL.filter(s=>s.dir===dir)){
+      const r=document.createElement('div'); r.className='srow';
+      const id=`${prefix}-${s.k}`;
+      r.innerHTML=`<label class="pn" for="${id}">${s.k}</label><input type="range" id="${id}" min="${s.min}" max="${s.max}" step="${s.step}" value="${DEF[s.k]}"><output for="${id}">${num(DEF[s.k])}</output><div class="hint">${s.hint}</div>`;
+      const inp=r.querySelector('input'), out=r.querySelector('output');
+      inp.addEventListener('input',()=>{ p[s.k]=+inp.value; out.textContent=num(p[s.k]); onChange(p); });
+      inputs[s.k]={inp,out}; g.appendChild(r);
+    }
+    box.appendChild(g);
+  }
+  return { p, reset(){ for(const k in DEF){ p[k]=DEF[k]; inputs[k].inp.value=DEF[k]; inputs[k].out.textContent=num(DEF[k]); } onChange(p); } };
+}
+
+/* ---------- Station 1 ---------- */
+let f1='quart';
+const plot1=makePlot($('cv1'));
+function upd1(p){
+  plot1.draw([{fn:FUNCS[f1].f,color:'--f'},{fn:gFun(f1,p),color:'--g',width:3}]);
+  $('terms1').innerHTML=`<div class="row"><span class="lab f-lab">f(x) =</span><span>${FUNCS[f1].html}</span></div><div class="row"><span class="lab g-lab">g(x) =</span><span>${termHTML(f1,p)}</span></div>`;
+  $('desc1').innerHTML=descHTML(p);
+}
+const s1=makeSliders($('sl1'),'s1',upd1);
+const fp=$('fpick1');
+for(const k in FUNCS){
+  const b=document.createElement('button'); b.className='chip'; b.textContent=FUNCS[k].chip; b.setAttribute('aria-pressed',k===f1);
+  b.addEventListener('click',()=>{ f1=k; fp.querySelectorAll('.chip').forEach(c=>c.setAttribute('aria-pressed',c===b)); upd1(s1.p); });
+  fp.appendChild(b);
+}
+$('reset1').addEventListener('click',()=>s1.reset());
+upd1(s1.p);
+
+/* ---------- Station 2 ---------- */
+const MISSIONS=[
+  {k:'sq',   t:{a:1,b:1,c:2,d:0},     hint:'Nur ein Regler: Der Graph ist nach links gewandert. Welcher Regler wirkt in x-Richtung?'},
+  {k:'cu',   t:{a:.5,b:1,c:-1,d:0},   hint:'Zwei Regler: Der Graph ist flacher (Streckung in y-Richtung) und nach rechts verschoben.'},
+  {k:'sin',  t:{a:1.5,b:1,c:0,d:1},   hint:'Zwei Regler, beide wirken in y-Richtung: Die Wellen sind höher und liegen weiter oben.'},
+  {k:'inv',  t:{a:1,b:1,c:1,d:-.5},   hint:'Achte auf die Asymptoten: senkrecht bei x = −1, waagrecht bei y = −0,5.'},
+  {k:'quart',t:{a:1,b:.5,c:0,d:1},    hint:'Der Graph ist doppelt so breit und liegt höher. Ein Regler wirkt in x-, einer in y-Richtung.'},
+  {k:'exp',  t:{a:1,b:2,c:1,d:0},     hint:'Beide Regler wirken in x-Richtung: Streckung mit Faktor ½ und Verschiebung um −1.'}
+];
+let mi=0, hintUsed=false, solved=false; const mRes=[]; let mPoints=0;
+const plot2=makePlot($('cv2'));
+function match(k,p,t){
+  const g=gFun(k,p), h=gFun(k,t); let n=0, sum=0, bad=false;
+  for(let x=-5;x<=5.001;x+=0.1){
+    const a=g(x), b=h(x), fa=isFinite(a)&&Math.abs(a)<6, fb=isFinite(b)&&Math.abs(b)<6;
+    if(!fa&&!fb) continue;
+    if(fa!==fb){ const v=fa?a:b; if(Math.abs(v)<5.5){bad=true; sum+=2; n++;} continue; }
+    const d=Math.abs(a-b); sum+=Math.min(d,3); n++; if(d>0.02) bad=true;
+  }
+  const mean=n?sum/n:3;
+  return {ok:!bad&&n>15, pct:bad?Math.min(97,Math.round(100*Math.exp(-mean*1.3))):100};
+}
+function dots(){
+  $('mDots').innerHTML=MISSIONS.map((_,i)=>`<i class="${mRes[i]==='ok'?'ok':mRes[i]==='skip'?'skip':i===mi?'cur':''}"></i>`).join('');
+  $('mScore').textContent=`${mPoints} / 12 Punkte`;
+}
+function upd2(p){
+  const M=MISSIONS[mi]; if(!M) return;
+  plot2.draw([{fn:FUNCS[M.k].f,color:'--f',width:1.8,alpha:.55},{fn:gFun(M.k,M.t),color:'--target',width:3,dash:[9,7]},{fn:gFun(M.k,p),color:'--g',width:3}]);
+  $('terms2').innerHTML=`<div class="row"><span class="lab f-lab">f(x) =</span><span>${FUNCS[M.k].html}</span></div><div class="row"><span class="lab g-lab">g(x) =</span><span>${termHTML(M.k,p)}</span></div>`;
+  if(solved) return;
+  const r=match(M.k,p,M.t);
+  $('mPct').textContent=r.pct+' %'; $('mMeter').style.width=r.pct+'%';
+  if(r.ok){
+    solved=true; const pts=hintUsed?1:2; mPoints+=pts; mRes[mi]='ok';
+    $('mFeedback').innerHTML=`<div class="banner ok"><h4>Getroffen! +${pts} ${pts===1?'Punkt':'Punkte'}</h4><p style="font-family:var(--font-math);font-size:1.15rem">g(x) = ${termHTML(M.k,M.t)}</p>${descHTML(M.t)}</div>`;
+    endMission();
+  }
+}
+const s2=makeSliders($('sl2'),'s2',upd2);
+function endMission(){
+  $('mHint').hidden=true; $('mSkip').hidden=true; $('mNext').hidden=false;
+  $('mNext').textContent = mi===MISSIONS.length-1 ? 'Weiter zum Quiz' : 'Nächste Mission';
+  $('sl2').querySelectorAll('input').forEach(i=>i.disabled=true); dots();
+  setTimeout(()=>$('mNext').focus({preventScroll:true}),0);
+}
+function loadMission(){
+  solved=false; hintUsed=false;
+  $('mFeedback').innerHTML=''; $('mHint').hidden=false; $('mHint').disabled=false; $('mSkip').hidden=false; $('mNext').hidden=true;
+  $('sl2').querySelectorAll('input').forEach(i=>i.disabled=false);
+  const M=MISSIONS[mi];
+  $('mTitle').textContent=`Mission ${mi+1} von ${MISSIONS.length}`;
+  $('mBase').innerHTML=`Ausgangsfunktion: <span style="font-family:var(--font-math);font-size:1.1em">f(x) = ${FUNCS[M.k].html}</span>`;
+  dots(); s2.reset();
+}
+$('mHint').addEventListener('click',()=>{ hintUsed=true; $('mHint').disabled=true;
+  $('mFeedback').innerHTML=`<div class="banner bad"><h4>Tipp</h4><p>${MISSIONS[mi].hint}</p></div>`; });
+$('mSkip').addEventListener('click',()=>{ const M=MISSIONS[mi]; solved=true; mRes[mi]='skip';
+  $('mFeedback').innerHTML=`<div class="banner bad"><h4>Lösung</h4><p style="font-family:var(--font-math);font-size:1.15rem">g(x) = ${termHTML(M.k,M.t)}</p>${descHTML(M.t)}</div>`;
+  endMission(); });
+$('mNext').addEventListener('click',()=>{ if(mi<MISSIONS.length-1){ mi++; loadMission(); } else { go(3); } });
+loadMission();
+
+/* ---------- Station 3: Quiz ---------- */
+const M_=s=>`<span class="m">${s}</span>`;
+const QUIZ=[
+  {q:'Wie erhält man G<sub>g</sub> aus G<sub>f</sub>?', m:['f(x) = x<sup>2</sup> + 1','g(x) = (x − 4)<sup>2</sup> − 1'],
+   o:['Verschiebung um 4 in x-Richtung und um −2 in y-Richtung','Verschiebung um −4 in x-Richtung und um −1 in y-Richtung','Verschiebung um 4 in x-Richtung und um −1 in y-Richtung','Verschiebung um −4 in x-Richtung und um −2 in y-Richtung'], r:0,
+   e:'(x − 4) heißt c = −4, also Verschiebung um +4 (nach rechts). In y-Richtung geht es von +1 auf −1, das sind −2.'},
+  {q:'Wie erhält man G<sub>g</sub> aus G<sub>f</sub>?', m:['f(x) = 3x<sup>3</sup>','g(x) = 4,5x<sup>3</sup> − 0,5'],
+   o:['Streckung mit dem Faktor 4,5 in y-Richtung und Verschiebung um −0,5 in y-Richtung','Streckung mit dem Faktor 1,5 in y-Richtung und Verschiebung um −0,5 in y-Richtung','Streckung mit dem Faktor 1,5 in x-Richtung und Verschiebung um −0,5 in y-Richtung','Verschiebung um 1,5 und um −0,5 in y-Richtung'], r:1,
+   e:'Es ist 4,5 : 3 = 1,5, also g(x) = 1,5 · f(x) − 0,5.'},
+  {q:'Wie erhält man G<sub>g</sub> aus G<sub>f</sub>?', m:['f(x) = 2<sup>x</sup>','g(x) = 2<sup>2(x + 1)</sup>'],
+   o:['Streckung mit dem Faktor 2 in x-Richtung und Verschiebung um −1 in x-Richtung','Streckung mit dem Faktor ½ in x-Richtung und Verschiebung um 1 in x-Richtung','Streckung mit dem Faktor ½ in x-Richtung und Verschiebung um −1 in x-Richtung','Streckung mit dem Faktor 2 in y-Richtung und Verschiebung um −1 in x-Richtung'], r:2,
+   e:'b = 2 ergibt den Faktor 1/b = ½ in x-Richtung. + 1 in der Klammer bedeutet Verschiebung um −1.'},
+  {q:'Der Graph von f(x) = x² wird mit dem Faktor 3 in x-Richtung gestreckt. Welcher Term gehört zum neuen Graphen?', m:[],
+   o:[M_('(3x)<sup>2</sup>'),M_('3x<sup>2</sup>'),M_('(⅓x)<sup>2</sup>'),M_('x<sup>2</sup> + 3')], r:2,
+   e:'Streckung mit dem Faktor 1/b = 3 in x-Richtung bedeutet b = ⅓, also f(⅓x) = (⅓x)². Der Graph wird breiter.'},
+  {q:'Welche Asymptoten hat der Graph von g?', m:['g(x) = <span class="frac"><span>1</span><span>x + 1</span></span> − 0,5'],
+   o:[M_('x = 1 und y = −0,5'),M_('x = −1 und y = 0,5'),M_('x = −1 und y = −0,5'),M_('x = 0 und y = 0')], r:2,
+   e:'Der Graph von 1/x wird um −1 in x-Richtung und um −0,5 in y-Richtung verschoben. Die Asymptoten x = 0 und y = 0 wandern mit.'},
+  {q:'Wie erhält man G<sub>g</sub> aus G<sub>f</sub>?', m:['f(x) = x<sup>4</sup> − 2x<sup>3</sup> + 2','g(x) = ½x<sup>4</sup> − x<sup>3</sup> − 1'],
+   o:['Nur Verschiebung um −3 in y-Richtung','Streckung mit dem Faktor 0,5 in y-Richtung, dann Verschiebung um −3 in y-Richtung','Streckung mit dem Faktor 2 in x-Richtung, dann Verschiebung um −2 in y-Richtung','Streckung mit dem Faktor 0,5 in y-Richtung, dann Verschiebung um −2 in y-Richtung'], r:3,
+   e:'½ · f(x) = ½x⁴ − x³ + 1. Damit −1 herauskommt, muss man noch um −2 verschieben.'}
+];
+let qi=0, qPoints=0;
+function renderQ(){
+  const box=$('quiz');
+  if(qi>=QUIZ.length){
+    box.innerHTML=`<div class="eyebrow">Quiz beendet</div><p class="q-prompt" style="margin-top:6px"><b>${qPoints} von ${QUIZ.length}</b> Fragen richtig.</p><div class="btns"><button class="btn" id="toRes">Zum Ergebnis</button></div>`;
+    $('toRes').addEventListener('click',()=>go(4)); return;
+  }
+  const Q=QUIZ[qi];
+  box.innerHTML=`<div class="mission-bar" style="margin-bottom:10px"><span class="eyebrow">Frage ${qi+1} von ${QUIZ.length}</span><span class="score-pill">${qPoints} richtig</span></div>
+   <p class="q-prompt"><b>${Q.q}</b></p>${Q.m.length?`<div class="q-math">${Q.m.map(s=>`<span>${s}</span>`).join('')}</div>`:''}
+   <div class="opts">${Q.o.map((o,i)=>`<button class="opt" data-i="${i}"><span class="k">${'ABCD'[i]}</span><span>${o}</span></button>`).join('')}</div>
+   <div id="qFb" style="margin-top:12px"></div>`;
+  box.querySelectorAll('.opt').forEach(b=>b.addEventListener('click',()=>{
+    const i=+b.dataset.i, ok=i===Q.r; if(ok) qPoints++;
+    box.querySelectorAll('.opt').forEach(x=>{ x.disabled=true; const j=+x.dataset.i; if(j===Q.r) x.classList.add('right'); else if(j===i) x.classList.add('wrong'); });
+    $('qFb').innerHTML=`<div class="banner ${ok?'ok':'bad'}"><h4>${ok?'Richtig!':'Leider nicht.'}</h4><p>${Q.e}</p></div><div class="btns" style="margin-top:10px"><button class="btn" id="qNext">${qi===QUIZ.length-1?'Auswertung':'Nächste Frage'}</button></div>`;
+    $('qNext').addEventListener('click',()=>{ qi++; renderQ(); }); $('qNext').focus({preventScroll:true});
+  }));
+}
+renderQ();
+
+/* ---------- Ergebnis & Navigation ---------- */
+function renderResult(){
+  const t=mPoints+qPoints;
+  $('rTotal').textContent=`${t} / 18`;
+  $('rDetail').textContent=`Zielgraphen: ${mPoints} von 12 Punkten · Quiz: ${qPoints} von 6 Punkten`;
+  $('rMsg').textContent = t>=15 ? 'Stark! Du kannst Verschiebungen und Streckungen sicher erkennen und anwenden.'
+    : t>=10 ? 'Gut gemacht. Schau dir die Regeln für die x-Richtung (b und c) noch einmal genau an.'
+    : 'Geh noch einmal zu Station 1 und probiere jeden Regler einzeln aus. Die Merkregeln unten helfen dir.';
+}
+const visited=new Set([1]);
+function go(n){
+  for(let i=1;i<=4;i++) $('st'+i).hidden = i!==n;
+  visited.add(n);
+  document.querySelectorAll('.step-btn').forEach(b=>{ const k=+b.dataset.go;
+    if(k===n) b.setAttribute('aria-current','step'); else b.removeAttribute('aria-current');
+    b.classList.toggle('done', k<n && visited.has(k)); });
+  if(n===4) renderResult();
+  plots.forEach(p=>p.resize());
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>go(+b.dataset.go)));
+$('restart').addEventListener('click',()=>{ mi=0; mPoints=0; mRes.length=0; qi=0; qPoints=0; loadMission(); renderQ(); s1.reset(); go(1); });
+})();
+</script>
+
+</body>
+</html>
